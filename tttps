@@ -1,0 +1,180 @@
+$file = Import-Csv "G:\everyone\M-BMD18-7\TTTN.csv" 
+$gameList =@();
+$activeGame =@();
+$errorheader=""
+
+function find-games{
+$file | ForEach-Object {
+  if (($_.P1N -eq $env:USERNAME -or $_.p2n -eq $env:USERNAME) -and $_.Running -eq "1"){
+    $global:gameList+= $_
+ }
+}
+if (($global:gameList.count) -ge 1) {
+ cls
+#write-host ($global:gameList.count) "Game(s) found"
+list-games
+}else{
+ $errorheader= "No games found try again"
+ main-menu
+ #next steps would be to create a game, or find games with no p2.
+  
+}
+
+}
+#--- List games---#
+function list-games {
+
+
+
+  write-host "Availible games"
+
+$gameList | ForEach-Object {
+ 
+  
+
+  if ( $_.p2n -eq ""){
+   $_.GN +"- Waiting for opponent"
+   }else{
+   $_.GN +"- " + $_.p1N +" VS " + $_.p2N
+   }
+  
+ }
+
+ # go on to select game. 
+  Select-Game 
+ }
+ #---- select game
+ function Select-Game{
+ $global:gameselect= read-host "Choose a game or type "Quit" "
+  
+ $gameList | ForEach-Object { if ( $gameselect -eq $_.GN -or $gameSelect -eq "Quit" ){ 
+ #if game is valid then set it to the active game.
+ $global:activeGame = $_;
+
+   display-board; break;} }
+ # if it doesn't find a valid game. 
+  cls
+ write-host "INVALID CHOICE select again.  "
+  
+ list-games
+  
+ }
+
+ 
+
+ function get-turn {
+ # if it's an odd turn then it's player 1's turn otherwise it's player 2's turn 
+ if ( $activeGame.turn %2 -eq 1){
+ return $activeGame.P1.ToString()
+ }else{
+ return $activeGame.P2.ToString()
+ }
+
+ }
+
+  function display-board {
+ cls
+ write-host ""
+ write-host ("`t`t"+ $activeGame.TL +"`t|`t"+ $activeGame.TM +"`t|`t"+ $activeGame.TR)
+ write-host ("`t`t"+$activeGame.ML +"`t|`t"+ $activeGame.M +"`t|`t"+ $activeGame.MR)
+ write-host ("`t`t"+$activeGame.BL +"`t|`t"+ $activeGame.BM +"`t|`t"+ $activeGame.BR)
+ write-host ""
+ write-host "`t`t`t`t"(get-turn)"'s Turn"
+
+   
+#$file[($global:gameselect-1)]
+place-marker
+ }
+ function check-draw{
+ return ([int]$global:activeGame.turn -eq 9) 
+ }
+
+
+
+ function check-Winner{
+return check-draw
+
+ }
+
+  function save-data{
+ write-host "Saving data"
+ }
+
+ function valid-placeholder($placeMarker){
+switch ($placeMarker){
+  7 {$activeGame.tl = (get-turn);break}
+  8 {$activeGame.tm = (get-turn);break}
+  9 {$activeGame.tr = (get-turn);break}
+  4{$activeGame.ml = (get-turn);break}
+  5 {$activeGame.m  = (get-turn);break}
+  6 {$activeGame.mr = (get-turn);break}
+  1 {$activeGame.bl = (get-turn);break}
+  2 {$activeGame.bm = (get-turn);break}
+  3 {$activeGame.br = (get-turn);break}
+  default { write-host "other";break;}
+}
+check-Winner
+#Increment the turn count
+$global:activeGame.turn=[int]$global:activeGame.turn+1
+#save the stuff back to the csv
+
+save-data
+
+
+#display the new board. 
+ cls
+ display-board
+ 
+ }
+
+ function place-marker {
+ if ((check-Winner) -eq $false ){
+  $placeMarker= read-host "Choose an availible location. "
+ 
+ switch ($placeMarker){
+  7 {if ($activeGame.tl -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  8 {if ($activeGame.tm -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  9 {if ($activeGame.tr -eq $placeMarker) {valid-placeholder($placeMarker) ;break }else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  4 {if ($activeGame.ml -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  5 {if ($activeGame.m  -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  6 {if ($activeGame.mr -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  1 {if ($activeGame.bl -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  2{ if ($activeGame.bm -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  3 {if ($activeGame.br -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+  default {place-marker; write-host "Invalid Selection";display-board;break;}
+} 
+
+
+ }else{
+ cls
+ write-host "Game Over"
+ }
+ }
+  
+  function main-menu {
+  cls
+write-host "1: New game"
+write-host "2: Join game"
+write-host "3: Quit"
+write-host $errorheader;$errorheader="";
+switch (read-host "Select an option:"){
+  1 {new-game;break}
+  2 {find-games;break}
+  3 {exit;break}
+  
+}
+
+}
+  
+ main-menu
+
+
+
+
+
+ 
+
+ 
+ 
+
+ 
