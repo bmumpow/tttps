@@ -117,15 +117,15 @@ if ($found) {Select-Game }else{
  function valid-placeholder($placeHolder){
  $result = $false
 switch ($placeHolder){
-  1 { if ($activeGame.bl -eq $placeHolder)  return $true}
-  2 { if ($activeGame.bm -eq $placeHolder)  return $true}
-  3 { if ($activeGame.br -eq $placeHolder)  return $true}
-  4 { if ($activeGame.ml -eq $placeHolder)  return $true}
-  5 { if ($activeGame.m  -eq $placeHolder)  return $true}
-  6 { if ($activeGame.mr -eq $placeHolder)  return $true}
-  7 { if ($activeGame.tl -eq $placeHolder)  return $true}
-  8 { if ($activeGame.tm -eq $placeHolder)  return $true}
-  9 { if ($activeGame.tr -eq $placeHolder)  return $true}
+  1 { if ($activeGame.bl -eq $placeHolder) { return $true}}
+  2 { if ($activeGame.bm -eq $placeHolder) {return $true}}
+  3 { if ($activeGame.br -eq $placeHolder) {return $true}}
+  4 { if ($activeGame.ml -eq $placeHolder) {return $true}}
+  5 { if ($activeGame.m  -eq $placeHolder) {return $true}}
+  6 { if ($activeGame.mr -eq $placeHolder) { return $true}}
+  7 { if ($activeGame.tl -eq $placeHolder) {return $true}}
+  8 { if ($activeGame.tm -eq $placeHolder) {return $true}}
+  9 { if ($activeGame.tr -eq $placeHolder) {return $true}}
   default {return $false;}
  
   
@@ -201,3 +201,14 @@ switch (read-host "Select an option:"){
 }
   
  main-menu
+
+
+
+
+
+ 
+
+ 
+ 
+
+ 
