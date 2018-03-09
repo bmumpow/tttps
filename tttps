@@ -79,7 +79,7 @@ if ($found) {Select-Game }else{
  write-host ("`t`t"+$activeGame.BL +"`t|`t"+ $activeGame.BM +"`t|`t"+ $activeGame.BR)
  write-host ""
  write-host "`t`t`t`t"(get-turn)"'s Turn"
-
+ place-marker
  }
 
 
@@ -114,49 +114,67 @@ if ($found) {Select-Game }else{
  write-host "Saving data"
  }
 
- function valid-placeholder($placeMarker){
+ function valid-placeholder($placeHolder){
+ $result = $false
+switch ($placeHolder){
+  1 { if ($activeGame.bl -eq $placeHolder)  return $true}
+  2 { if ($activeGame.bm -eq $placeHolder)  return $true}
+  3 { if ($activeGame.br -eq $placeHolder)  return $true}
+  4 { if ($activeGame.ml -eq $placeHolder)  return $true}
+  5 { if ($activeGame.m  -eq $placeHolder)  return $true}
+  6 { if ($activeGame.mr -eq $placeHolder)  return $true}
+  7 { if ($activeGame.tl -eq $placeHolder)  return $true}
+  8 { if ($activeGame.tm -eq $placeHolder)  return $true}
+  9 { if ($activeGame.tr -eq $placeHolder)  return $true}
+  default {return $false;}
+ 
+  
+} 
+
+return $result
+
+
+
+
+ }
+
+
+
+
+
+ function place-marker {
+ #If there is no winner Then 
+ if ((check-Winner) -eq $false ){
+  # Get users input
+  $placeMarker= read-host "Choose an availible location. "
+  #Validate Users input
+if   (valid-placeholder($placeMarker)){
 switch ($placeMarker){
-  7 {$activeGame.tl = (get-turn);break}
-  8 {$activeGame.tm = (get-turn);break}
-  9 {$activeGame.tr = (get-turn);break}
-  4{$activeGame.ml =  (get-turn);break}
-  5 {$activeGame.m  = (get-turn);break}
-  6 {$activeGame.mr = (get-turn);break}
   1 {$activeGame.bl = (get-turn);break}
   2 {$activeGame.bm = (get-turn);break}
   3 {$activeGame.br = (get-turn);break}
+  4 {$activeGame.ml = (get-turn);break}
+  5 {$activeGame.m  = (get-turn);break}
+  6 {$activeGame.mr = (get-turn);break}
+  7 {$activeGame.tl = (get-turn);break}
+  8 {$activeGame.tm = (get-turn);break}
+  9 {$activeGame.tr = (get-turn);break}
   default { write-host "other";break;}
 }
-check-Winner
+ 
+#valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
+}
+ 
 #Increment the turn count
 $global:activeGame.turn=[int]$global:activeGame.turn+1
 #save the stuff back to the csv
-
 save-data
-
-
 #display the new board. 
- 
  display-board
- place-marker
- }
-
- function place-marker {
- if ((check-Winner) -eq $false ){
-  $placeMarker= read-host "Choose an availible location. "
  
- switch ($placeMarker){
-  7 {if ($activeGame.tl -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  8 {if ($activeGame.tm -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  9 {if ($activeGame.tr -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  4 {if ($activeGame.ml -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  5 {if ($activeGame.m  -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  6 {if ($activeGame.mr -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  1 {if ($activeGame.bl -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  2{ if ($activeGame.bm -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  3 {if ($activeGame.br -eq $placeMarker) {valid-placeholder($placeMarker) ;break}else{ display-board; write-host "Already in use Try again.";  place-marker;break}}
-  default {place-marker; write-host "Invalid Selection";display-board;break;}
-} 
+
+
+
 
 
  }else{
@@ -183,14 +201,3 @@ switch (read-host "Select an option:"){
 }
   
  main-menu
-
-
-
-
-
- 
-
- 
- 
-
- 
