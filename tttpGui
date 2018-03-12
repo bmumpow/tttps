@@ -1,0 +1,596 @@
+
+###Note, this script does not yet use reusable runspaces. So there is potential for high memory consumption ;)
+$fileDir ="C:\Updates\"
+$fileSubfix = "-TTT.csv"
+
+
+
+ 
+#region  Runspace that loads/saves the csv
+#####
+# Background Runspace:
+#  This runspace will save/load the data to keep it synced with the CSV file. 
+###
+$data = [hashtable]::Synchronized(@{})
+# Sync up the variables before you runspace it or you wont be able to access them.
+$data.gameNumber=-1
+$data.Dir =$fileDir
+$data.Subfix = $fileSubfix 
+$data.FileLocation= ""
+$data.file = ""
+$data.gameLoad=$True
+$data.Flag = $True
+$data.winnerFound=$false; 
+$data.Host = $host
+$data.whosTurn="Load a game"
+[string]$data.board="test" #wont b e needed with gui 
+
+
+$runspace = [runspacefactory]::CreateRunspace()
+$runspace.Open()
+$runspace.SessionStateProxy.SetVariable('data',$data)
+$powershell = [powershell]::Create()
+$powershell.Runspace = $runspace
+$powershell.AddScript({
+ 
+
+    While ($data.Flag ) {
+try{
+    
+
+function get-turn    { 
+     if ( $data.activegame.turn %2 -eq 1){
+     return $data.activegame.P2.ToString()
+  }else{
+       return $data.activegame.P1.ToString()
+ }
+ }   #Figure out whos turn it is return Player name
+function get-player  { 
+       if ( $data.activegame.turn %2 -eq 1){
+     return $data.activegame.P2N.ToString()
+  }else{
+       return $data.activegame.P1N.ToString()
+ }
+}   #Which players turn   
+ 
+function check-Winner{ 
+  return (
+         ((($data.activegame.tl -eq $data.activegame.ml) -and ($data.activegame.ml -eq $data.activegame.bl)) -or 
+         (($data.activegame.tm -eq $data.activegame.M) -and ($data.activegame.M -eq $data.activegame.bm)) -or 
+         (($data.activegame.tr -eq $data.activegame.mr) -and ($data.activegame.mr -eq $data.activegame.bR))  -or
+         #check Horizontals
+         (($data.activegame.tl -eq $data.activegame.TM) -and ($data.activegame.TM -eq $data.activegame.TR)) -or 
+         (($data.activegame.ml -eq $data.activegame.M) -and ($data.activegame.M -eq $data.activegame.MR)) -or 
+         (($data.activegame.bl -eq $data.activegame.bM) -and ($data.activegame.bM -eq $data.activegame.bR)) -or
+         #Check Diagonals
+         (($data.activegame.tl -eq $data.activegame.M) -and ($data.activegame.M -eq $data.activegame.br)) -or 
+         (($data.activegame.tR -eq $data.activegame.M) -and ($data.activegame.M -eq $data.activegame.bL))  -or
+         #Check Draw
+         ([int]$data.activegame.turn -eq 9)))
+
+ 
+ }   #Figure out if there's a winner
+ 
+ Function Set-FileLocation {
+ $data.FileLocation= $data.Dir+$data.GameNumber+$data.Subfix
+ }
+ Function set-Player2 {
+ if (($data.activeGame.p1N -ne $env:USERNAME) -and ($data.activeGame.p2N -eq "")){
+$data.activeGame.p2N = $env:Username
+
+}
+
+if( $env:Username.substring(0,1) -eq $data.activeGame.p1){
+$data.activeGame.p2 = "X"
+}else{
+
+$data.activeGame.p2 =$env:Username.substring(0,1)
+}
+Save-game
+ }
+
+function Load-game   {
+ set-fileLocation 
+$data.file = Import-CSV  $data.FileLocation
+ $data.activeGame=$data.file[0]
+$data.whosTurn= (get-turn) 
+$data.activegame.Whosturn=(get-player)
+Set-Player2
+
+
+
+
+ }   #Load the game
+ 
+
+function Save-game   {
+ $data.activegame | Export-CSV -Path $data.FileLocation -NoTypeInformation
+ $data.gameLoad=$true
+ 
+ }   #Save the game
+function new-game    {
+ Set-FileLocation
+ 
+         $Info = @(   
+         ("WhosTurn",  ($env:Username).substring(0,1) ),
+         ("Running", "1"),
+         ("Turn", "0"),
+         ("P1N", "$env:Username"),
+         ("P2N", ""),
+         ("P1",  ($env:Username).substring(0,1) ),
+         ("P2", ""),
+         ("BL", ""),
+         ("BM", ""),
+         ("BR", ""),
+         ("ML", ""),
+         ("M", ""),
+         ("MR", ""),
+         ("TL", ""),
+         ("TM", ""),
+         ("TR", ""),
+         ("Date", ([string](get-date).day+[string](get-date).year))
+         )
+                 
+        $csvContents = @() # Create the empty array that will eventually be the CSV file
+        $row = New-Object PSCustomObject # Create an object to append to the array
+        foreach ($header in $Info) {
+            $row | Add-Member -MemberType NoteProperty -Name $header[0] -Value $header[1]
+        }
+        $csvContents += $row # append the new data to the array
+        if ( (Test-Path ($data.Dir)) -eq $false) {mkdir $data.Dir}
+        $csvContents | Export-CSV -Path $data.FileLocation -NoTypeInformation
+$data.Host.ui.WriteVerboseLine("Game Created")
+ 
+
+        $data.gameLoad=$true
+        
+
+ }   #Setup a new game
+function Main        {
+ $data.winnerFound=(check-winner)
+    if (( $data.gameLoad) -and ($data.gameNumber -ne -1)  ){
+    if ($data.gameLoad){
+    load-game
+    }else{
+     Save-game
+    }
+    }
+}   # Main function. Kicks off everything
+main    
+    
+
+        # if you don't write-verbose it wont run the script again. Putting this in will continue to update the script
+         write-verbose "This will allow a hidden tick" -OutVariable test 
+}catch [System.IO.IOException] { #Catch any errors in the runspace (otherwise you wont know something stops working) 
+$data.gameLoad = $false
+$data.Host.ui.WriteVerboseLine("$error :Creating the file")
+set-fileLocation 
+ new-game
+ 
+
+}#catch the file exception (and create the file AND directoryif not found)
+ catch{
+$data.Host.ui.WriteVerboseLine("error:$error")
+exit
+} #catch and report all other errors within the Runspace
+    } #The while loop
+
+     
+   
+}) | Out-Null
+$handle = $powershell.BeginInvoke()
+#endregion
+
+
+
+
+
+#region Runspace that loads the gui
+##################################################################################################################
+#####
+# Gui Runspace
+#  This region is for the gui
+#
+### 
+#region +=+=++=+=++=+=+NOTES+=+=+=+=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++ 
+# If you set window state to maximized it wont open upcentered (unless it's set to resize of coarse)  
+# checkstate will let you toggle a checkbox. Checked will keep it always on.
+# Changing form properties wont update Eg. Form Topmost
+# get-variable WPF_* |Where-Object {$_.value -like '*utton*'}   You can search for object by type.
+# get-variable WPF_* |Where-Object {$_.value -like '*utton*'}  
+# RECCOMEND putting each "section" of WPF_ items in it's own Try/Catch. that way if something goes wrong only one section fails 
+#          * Variables should be created using the WPF_ prefix , this makes finding them easier
+#          * Variables should have AAF_ prefix (optional) to allow easier locating
+#          * Create events in  the ADD EVENT SECTION
+#          * Do NOT edit the regions desginated with ++++
+#          * Editable sections should be ===== for ease of location
+#          * Visual Studio community will allow quicker xmal creation. Download it free from microsoft.
+#          * Try to stick to naming convention documented below (and add to them as you add new)
+#          * AAV_ are variables that can be edited with out messing up to much code
+#          * WPF_ are WPF_ items(Buttons, textboxes, web interfaces, checkboxes,radio buttons....etc)
+#                *BTN = Button          *TXT = Textbox      *WEB = WebInterface    
+#                *RDO = RadioButton     *MNU = Menu         *CHK = CheckBox
+#          * AAF_ are variables that changing may screw up the base code.
+# WARNING: This is a script, order of the regions does matter. If regions are numbered keep them in order!  
+#+=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=++=+=
+#endregion
+#---------------------------------------------------------------------------------------------------
+#region 1------------- ADD VARIABLES HERE------------------------------------------------------------ 
+# $AAV_PATH   is the path to the xaml file generated in Visual studio 
+# $AAV_DEBUG if you're debugging a code set this to 1 so powershell wont automatically close
+# $A
+$AAV_PATH=  "C:\Users\Noneya\source\repos\TTT\TTT\MainWindow.xaml" 
+$AAV_DEBUG=1;
+ 
+#endregion 
+#---------------------------------------------------------------------------------------------------
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#region  2++++++++++DO NOT EDIT (xaml load from file script)++++++++++
+#Cleanup potential old variables designated with AAF_ or WMF (this keeps things from appearing fine in testing)
+ 
+Remove-Variable WPF_*,AAF_*  
+$AAF_wshell = New-Object -ComObject Wscript.Shell
+# Get the path of the XAML file listed above
+ $AAF_inputXML = get-content $AAV_PATH
+# Remove all the fluff to maket he code run 
+ $AAF_inputXML = $AAF_inputXML -replace 'mc:Ignorable="d"','' -replace "x:N",'N'  -replace '^<Win.*', '<Window'
+ 
+[void][System.Reflection.Assembly]::LoadWithPartialName('presentationframework')
+[xml]$AAF_XAML = $AAF_inputXML
+#intalize the reader.
+    $AAF_reader=(New-Object System.Xml.XmlNodeReader $AAF_xaml)
+#if the reader doesn't work correctly inform user to install .net 
+  try{$AAF_Form=[Windows.Markup.XamlReader]::Load( $AAF_reader )}
+catch{write-output "Unable to load Windows.Markup.XamlReader. Double-check syntax and ensure .net is installed."}
+# Create all the variables based on the XAML Input
+ $AAF_xaml.SelectNodes("//*[@Name]") | %{Set-Variable -Name "WPF_$($_.Name)" -Value $AAF_Form.FindName($_.Name)}
+#endregion
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#region  3++++++++++DO NOT EDIT (Required Functions)++++++++++
+# This will display errors for WPF_'s in a formatted manner.
+Function display-Error{
+
+  $AAF_FormatString = "{0} : {1}`n{2}`n"  +
+                  "    + CategoryInfo          : {3}`n"
+                #  "    + FullyQualifiedErrorId : {4}`n"
+  $AAF_fields = $_.InvocationInfo.MyCommand.Name,
+          $_.ErrorDetails.Message, 
+            $_.InvocationInfo.PositionMessage,
+            $_.CategoryInfo.ToString(),
+            $_.FullyQualifiedErrorId
+
+  $AAF_FormatString -f $AAF_fields
+ #write-output -Foreground Red -Background Black ($AAF_FormatString -f $AAF_fields)
+ $AAF_wshell.Popup("$AAF_fields",0,"$ErrorMessage",0x1)
+  break
+ 
+}
+#endregion 
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#---------------------------------------------------------------------------------------------------
+#region  4-------------ADD EVENTS HERE------------
+
+####################################################################################################
+####  TIP: You can run "$WPF_label |get-member -name *add*,*set* -force|Out-GridView" a variable with a get-member force to see all options
+####       Just be sure to pick a variable you have created already which may require it ran once. 
+####       use -force(to show all possible) with out *add* and *set* to get a list of every command.  
+####  WARNING: As of this code if you fail inside the try catch all events after it will fail. 
+####           Either fix every error it throws, or breakup the try/catches so you can skip fails.
+#####################################################################################################
+ 
+ try { ## Enclose this in a try catch other wise if you delete or rename an element you will get an error.
+# Popululate the useful links (the html will need to be formatted later)
+ 
+  
+ 
+
+  
+  
+ function set-board{
+ $WPF_txtB_gameNumMain.text = "Game number:  " + $data.gameNumber.tostring()
+$WPF_txtB_P1Name.text = $data.activegame.P1N
+$WPF_txtB_P2Name.text = $data.activegame.P2N
+$WPF_btn_TL.content= $data.activegame.TL
+$WPF_btn_TM.content= $data.activegame.TM
+$WPF_btn_TR.content= $data.activegame.TR
+$WPF_btn_ML.content= $data.activegame.ML
+$WPF_btn_M. content= $data.activegame.M
+$WPF_btn_MR.content= $data.activegame.TR
+$WPF_btn_BL.content= $data.activegame.BL
+$WPF_btn_BM.content= $data.activegame.BM
+$WPF_btn_BR.content= $data.activegame.BR
+$WT=$data.file.Whosturn
+
+if ($data.activeGame.p2n -eq ""){
+$WPF_txtB_InfoMain.text = "Waiting on new player"
+}else{
+$WPF_txtB_InfoMain.text = $wt +"'s turn"
+}
+
+## Set the color of the buttons
+
+ $buttons = @($WPF_btn_TL , $WPF_btn_TM, $WPF_btn_TR,
+            $WPF_btn_ML , $WPF_btn_M, $WPF_btn_MR,
+            $WPF_btn_BL , $WPF_btn_BM, $WPF_btn_BR )
+             
+       foreach ($button in $buttons) {
+            if ($button.content -eq $data.activeGame.p1) {$button.foreground = $WPF_txtB_P1Name.Foreground}elseif ($button.content -eq $data.activeGame.P2) {$button.foreground = $WPF_txtB_P2Name.Foreground}else {$button.foreground = $button.background}
+        }
+ }
+ function load-game {
+ $data.gameNumber = [int]$wpf_txt_GameNumber.Text;
+$WPF_txtB_gameNumMain.text = "Game number:  " + $data.gameNumber.tostring()
+ 
+
+
+set-board
+
+ }
+
+function place-marker($place){
+if ($data.gameLoad){ set-board
+}else{
+
+}
+}
+ 
+
+function script:EventHandlers{   
+ 
+    $WPF_btn_BL.Add_Click( {place-marker(1)})
+    $WPF_btn_BM.Add_Click( {place-marker(2)})
+    $WPF_btn_BR.Add_Click( {place-marker(3)})
+    $WPF_btn_ML.Add_Click( {place-marker(4)})
+    $WPF_btn_M. Add_Click( {place-marker(5)})
+    $WPF_btn_MR.Add_Click( {place-marker(6)})
+    $WPF_btn_TL.Add_Click( {place-marker(7)})
+    $WPF_btn_TM.Add_Click( {place-marker(8)})
+    $WPF_btn_TR.Add_Click( {place-marker(9)})
+    $WPF_btn_NewGame.add_Click( {New-Game})
+    $WPF_btn_LoadGame.add_Click( {load-game })
+    #$WPF_txt_GameNumber.add_Layoutupdated({$WPF_txtB_gameNumMain.text= "Success"})
+    $WPF_btn_End.add_Click( { })
+ }    
+ set-board
+EventHandlers
+  
+ 
+
+ }catch    {
+ display-Error
+  }finally{
+  #Victory is ours!
+  if ($AAV_DEBUG -eq 1 -and !$error){
+  Write-host  -Foreground Red -Background Black ("WPF created successfully")
+  }
+  }
+
+ 
+
+ 
+
+#endregion
+#---------------------------------------------------------------------------------------------------
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#region  5++++++++++DO NOT EDIT (Form load script)++++++++++
+ # this region is for loading the form. Do not edit with out indepth testing and research
+
+# Make PowerShell Disappear if not in debugging mode
+
+
+ 
+  
+if ($AAV_DEBUG -ne 1){
+# Add required assemblies
+Add-Type -AssemblyName PresentationFramework, System.Drawing, System.Windows.Forms, WindowsFormsIntegration
+ # Add Exit which makes sure powershell is closed
+$AAF_form.Add_Closing({[System.Windows.Forms.Application]::Exit(); Stop-Process $pid;})
+$AAF_formcode = '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);' 
+$asyncwindow = Add-Type -MemberDefinition $AAF_formcode -name Win32ShowWindowAsync -namespace Win32Functions -PassThru 
+$null = $asyncwindow::ShowWindowAsync((Get-Process -PID $pid).MainWindowHandle, 0) 
+# Allow input to window for TextBoxes, etc
+[System.Windows.Forms.Integration.ElementHost]::EnableModelessKeyboardInterop($AAF_form)
+# Running this without $appContext and ::Run would actually cause a really poor response.
+$AAF_form.Show()
+# This makes it pop up
+$AAF_form.Activate()
+# Create an application context for it to all run within. 
+# This helps with responsiveness and threading.
+$appContext = New-Object System.Windows.Forms.ApplicationContext 
+[void][System.Windows.Forms.Application]::Run($appContext)
+}else{
+$AAF_Form.Add_ContentRendered({    
+    write-output "Debugger mode active set AAV_DEBUG to ""0"" when complete."   
+})
+$AAF_Form.ShowDialog()| Out-Null
+}
+
+#if in debugging mode show the form.
+
+
+
+#endregion
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#region  6++++++++++DO NOT EDIT (Debugging Functions)++++++++++
+# This is for if you want to see all variables with the WPF_ AAF_ and AAV_ Naming Convention
+Function Get-FormVariables{
+if ($global:ReadmeDisplay -ne $true){write-host "If you need to reference this display again, run Get-FormVariables" -ForegroundColor Yellow;$global:ReadmeDisplay=$true}
+write-hos "Found the following interactable elements from our form" -ForegroundColor Cyan
+get-variable WPF_*,AAF_*,AAV_*|Sort-Object -Property value
+}
+Function Get-WPF_S{
+if ($global:ReadmeDisplay -ne $true){write-host "If you need to reference this display again, run Get-FormVariables" -ForegroundColor Yellow;$global:ReadmeDisplay=$true}
+write-host "Found the following interactable elements from our form" -ForegroundColor Cyan
+get-variable WPF_*|select-object name,@{Name="Value"; Expression= {$_.Value -replace "System.Windows.Controls.","" }}|Sort-Object -Property value|Format-table
+
+
+}
+
+
+
+#endregion
+ #endregion
+
+
+
+
+
+
+
+
+
+
+
+
+#region Gameplay mostly text
+function old{
+
+
+##################################################################################################################
+#####
+# Gameplay code
+#  This region is the game itself.
+#
+### 
+
+
+
+
+
+ function valid-placeholder($placeHolder){
+ 
+switch ($placeHolder){
+  1 { if ($data.file.bl -eq $placeHolder) {return $true}}
+  2 { if ($data.file.bm -eq $placeHolder) {return $true}}
+  3 { if ($data.file.br -eq $placeHolder) {return $true}}
+  4 { if ($data.file.ml -eq $placeHolder) {return $true}}
+  5 { if ($data.file.m  -eq $placeHolder) {return $true}}
+  6 { if ($data.file.mr -eq $placeHolder) {return $true}}
+  7 { if ($data.file.tl -eq $placeHolder) {return $true}}
+  8 { if ($data.file.tm -eq $placeHolder) {return $true}}
+  9 { if ($data.file.tr -eq $placeHolder) {return $true}}
+  default {return $false;}
+ 
+  
+} 
+}
+
+ function place-marker($message) {
+ 
+ #If there is no winner Then 
+ if ($data.winnerFound){
+  write-host "Game Over"
+ $again = read-host "Do you want to play again? (y/n)"
+ if ($again -eq "y"){ main-menu}else{write-host "Thanks for playing"}
+
+ }else{
+ cls
+ $data.board;
+  # Get users input
+  $placeMarker= read-host $message
+  #Validate Users input
+if   ((valid-placeholder($placeMarker))){
+
+switch ($placeMarker){
+  1 {$data.file.bl = $data.file.whosTurn;break}
+  2 {$data.file.bm = $data.file.whosTurn;break}
+  3 {$data.file.br = $data.file.whosTurn;break}
+  4 {$data.file.ml = $data.file.whosTurn;break}
+  5 {$data.file.m  = $data.file.whosTurn;break}
+  6 {$data.file.mr = $data.file.whosTurn;break}
+  7 {$data.file.tl = $data.file.whosTurn;break}
+  8 {$data.file.tm = $data.file.whosTurn;break}
+  9 {$data.file.tr = $data.file.whosTurn;break}
+  default { write-host "other";break;}
+}
+ #Increment the turn count
+$data.file.turn=[int]$data.file.turn+1
+  #save the stuff back to the csv
+ place-marker("Choose an availible location. ")
+ 
+}else{
+place-marker("Already in use Try again.")
+  
+ }
+ } 
+ }
+
+
+
+
+
+
+ 
+ function join-game($message){
+ $global:gameList=@();
+cls
+
+  write-host "Availible games "
+# Pass in the file and add each one to the list. 
+$data.file | ForEach-Object {
+
+# Check to see if the user querying has an active game. 
+  if (($_.P1N -eq $env:USERNAME -or $_.P2N -eq $env:USERNAME) -and $_.Running -eq "1"){
+ 
+  $global:gameList+= $_
+    if ( $_.P2N -eq ""){
+    # If they are the host of a game with no opponent
+   $_.GN +"- Waiting for opponent"
+   }else{
+    # Otherwise display the names of both
+   $_.GN +"- " + $_.P1N +" VS " + $_.P2N
+   }
+   $found=$true
+   $global:gameList += $_.GN
+ }
+}
+#If there's more than one display the list. 
+if ($found) {
+ $global:gameselect= read-host "$message "
+ if ($gameselect -eq "quit"){cls;write-host "Thanks for playing";exit} 
+  
+ $global:gameList | ForEach-Object  { 
+ $data.gameNumber=$_.GN 
+ if ( $gameselect -eq $_.GN ){ 
+ #if game is valid then set it to the active game.
+   start-sleep -seconds 1
+ 
+ place-marker("Choose an availible location. ")
+    break;} }
+ # if it doesn't find a valid game. 
+   
+ join-game("Invalid selection try again or type ""Quit""")
+ }else{
+new-game
+
+ }
+  
+
+}
+
+
+
+
+
+   function main-menu {
+   #Set the game number to -1 to stop the save/load process.
+$data.gameNumber = -1;
+   #Ask the user what they want to do 
+cls
+write-host "1: New game"
+write-host "2: Join game"
+write-host "3: Quit"
+switch (read-host "Select an option:"){
+  1 {new-game;break}
+  2 {join-game("Select a game or type Quit")  ;break}
+  3 {exit;break}
+  default { main-menu}
+  
+}
+
+}
+  
+ main-menu
+
+ #endregion
+ }#Wont be needed with GUI
